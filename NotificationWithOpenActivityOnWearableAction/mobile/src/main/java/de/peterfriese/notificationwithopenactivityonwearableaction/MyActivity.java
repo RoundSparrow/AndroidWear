@@ -11,12 +11,16 @@ import android.widget.Button;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.wearable.DataApi;
+import com.google.android.gms.wearable.MessageApi;
 import com.google.android.gms.wearable.PutDataMapRequest;
 import com.google.android.gms.wearable.PutDataRequest;
 import com.google.android.gms.wearable.Wearable;
 
 import java.text.DateFormat;
 import java.util.Date;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import de.peterfriese.notificationwithopenactivityonwearableaction.common.Constants;
 
@@ -64,6 +68,7 @@ public class MyActivity extends Activity {
     @Override
     protected void onStart() {
         super.onStart();
+        Log.d(TAG, "onStart");
         mGoogleApiClient.connect();
     }
 
@@ -78,13 +83,31 @@ public class MyActivity extends Activity {
         return dateFormat.format(new Date());
     }
 
+
+    AtomicInteger sendNotificationIndex = new AtomicInteger(0);
+
     private void sendNotification() {
         if (mGoogleApiClient.isConnected()) {
+            int sendIndex = sendNotificationIndex.incrementAndGet();
             PutDataMapRequest dataMapRequest = PutDataMapRequest.create(Constants.NOTIFICATION_PATH);
+            dataMapRequest.getDataMap().putInt("sendIndex", sendIndex);
             dataMapRequest.getDataMap().putString(Constants.NOTIFICATION_TITLE, "This is the title");
-            dataMapRequest.getDataMap().putString(Constants.NOTIFICATION_CONTENT, "This is a notification with some text.");
+            dataMapRequest.getDataMap().putString(Constants.NOTIFICATION_CONTENT, "This is a notification with some text. Index: " + sendIndex);
             PutDataRequest putDataRequest = dataMapRequest.asPutDataRequest();
-            Wearable.DataApi.putDataItem(mGoogleApiClient, putDataRequest);
+            Wearable.DataApi.putDataItem(mGoogleApiClient, putDataRequest)
+                    .setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
+                        @Override
+                        public void onResult(DataApi.DataItemResult dataItemResult) {
+                            if (!dataItemResult.getStatus().isSuccess()) {
+                                Log.e(TAG, "ERROR: failed to putDataItem, status code: "
+                                        + dataItemResult.getStatus().getStatusCode());
+                            } else {
+                                Log.d(TAG, "putDataItem good");
+                            }
+                        }
+                    });
+            // ---
+            Log.d(TAG, "sendNotification");
         }
         else {
             Log.e(TAG, "No connection to wearable available!");
