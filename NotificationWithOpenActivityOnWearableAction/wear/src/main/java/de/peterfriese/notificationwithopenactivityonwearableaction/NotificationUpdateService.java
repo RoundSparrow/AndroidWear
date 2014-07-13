@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.app.NotificationManagerCompat;
 import android.util.Log;
+import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -20,16 +21,19 @@ import com.google.android.gms.wearable.DataMapItem;
 import com.google.android.gms.wearable.Wearable;
 import com.google.android.gms.wearable.WearableListenerService;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 import de.peterfriese.notificationwithopenactivityonwearableaction.common.Constants;
 
 import static com.google.android.gms.wearable.PutDataRequest.WEAR_URI_SCHEME;
 
 public class NotificationUpdateService extends WearableListenerService {
 
-    private int notificationId = 001;
+    private AtomicInteger notificationId = new AtomicInteger(1);
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        android.util.Log.i("Service", "Service Started");
         if (null != intent) {
             String action = intent.getAction();
             if (Constants.ACTION_DISMISS.equals(action)) {
@@ -41,6 +45,7 @@ public class NotificationUpdateService extends WearableListenerService {
 
     @Override
     public void onDataChanged(DataEventBuffer dataEvents) {
+        android.util.Log.d("Service", "onDataChanged count: " + dataEvents.getCount());
         for(DataEvent dataEvent: dataEvents) {
             if (dataEvent.getType() == DataEvent.TYPE_CHANGED) {
                 if (Constants.NOTIFICATION_PATH.equals(dataEvent.getDataItem().getUri().getPath())) {
@@ -49,11 +54,21 @@ public class NotificationUpdateService extends WearableListenerService {
                     String content = dataMapItem.getDataMap().getString(Constants.NOTIFICATION_CONTENT);
                     sendNotification(title, content);
                 }
+                else
+                {
+                    android.util.Log.w("Service", "unmatched path: " + dataEvent.getDataItem().getUri());
+                }
+            }
+            else
+            {
+                android.util.Log.w("Service", "unmatched type: " + dataEvent.getType());
             }
         }
     }
 
     private void sendNotification(String title, String content) {
+        int myIndex = notificationId.incrementAndGet();
+        android.util.Log.w("Service", "sendNotification " + myIndex + ": " + title + " content: " + content);
 
         // this intent will open the activity when the user taps the "open" action on the notification
         Intent viewIntent = new Intent(this, MyActivity.class);
@@ -73,7 +88,9 @@ public class NotificationUpdateService extends WearableListenerService {
         Notification notification = builder.build();
 
         NotificationManagerCompat notificationManagerCompat = NotificationManagerCompat.from(this);
-        notificationManagerCompat.notify(notificationId++, notification);
+        notificationManagerCompat.notify(myIndex, notification);
+
+        Toast.makeText(getApplicationContext(), "Notification " + myIndex, Toast.LENGTH_SHORT).show();
     }
 
     private void dismissNotification() {
